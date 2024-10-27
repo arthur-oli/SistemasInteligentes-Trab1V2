@@ -1,9 +1,11 @@
 import random
 from collections import defaultdict
 from math import exp
-from copy import deepcopy
 import matplotlib.pyplot as plt
 import numpy as np
+import cProfile
+import pstats
+import io
 
 class Item:
     def __init__(self, weight, value, name):
@@ -25,6 +27,13 @@ class State:
         self.item_list = defaultdict(int)
         self.total_items_weight = 0
         self.total_items_value = 0
+
+    def copy(self):
+        new_state = State()
+        new_state.item_list = self.item_list.copy()
+        new_state.total_items_weight = self.total_items_weight
+        new_state.total_items_value = self.total_items_value
+        return new_state
 
     def add_item(self, item):
         if item in self.item_list:
@@ -63,13 +72,13 @@ class State:
         for item in self.item_list.keys():
             if item.name == name:
                 return item, self.item_list[item]
-        return None, 0  # Retorna None e 0 se o item não for encontrado
+        return None, 0
 
-def create_items(item_names):
+def create_items(item_names, min_item_weight, max_item_weight, min_item_value, max_item_value):
     items_list = []
     for name in item_names:
-        random_weight = random.randint(1, 10)
-        random_value = random.randint(1, 20)
+        random_weight = random.randint(min_item_weight, max_item_weight)
+        random_value = random.randint(min_item_value, max_item_value)
         items_list.append(Item(random_weight, random_value, name))
 
     return items_list
@@ -95,7 +104,7 @@ def calculate_temperature(start_temperature, temperature_function, changing_rate
     return T
 
 def create_possible_state(current_state):
-    possible_state = deepcopy(current_state)
+    possible_state = current_state.copy()
     operation = random.choice(["add", "remove", "swap"])
 
     if operation == "add":
@@ -130,19 +139,19 @@ def simulated_annealing(starting_state, start_temperature, temperature_function,
     current_step = 1
     step_best_state_found = 1
     T = start_temperature
-    current_state = deepcopy(starting_state)
-    best_state = deepcopy(starting_state)
+    current_state = starting_state.copy()
+    best_state = starting_state.copy()
     while (T > 0):
         possible_state = create_possible_state(current_state)
         delta_value = possible_state.get_total_value() - current_state.get_total_value() 
         if(delta_value > 0):
-            current_state = deepcopy(possible_state)
+            current_state = possible_state.copy()
             if(possible_state.get_total_value() > best_state.get_total_value()):
-                best_state = deepcopy(possible_state)
+                best_state = possible_state.copy()
                 step_best_state_found = current_step
         
         elif random.random() < exp(delta_value / T):
-            current_state = deepcopy(possible_state)
+            current_state = possible_state.copy()
 
         T = calculate_temperature(start_temperature, temperature_function, changing_rate, current_step)
         current_step += 1
@@ -174,13 +183,13 @@ def print_best_state(best_state):
     print(f"{'Peso Total do Estado:':<35} {best_state.get_total_weight():<15}")
 
 
-def plot_absolute_values_histogram(final_values, best_values, step_best_state_found):
+def plot_histograms(final_values, best_values, step_best_state_found):
     # Definindo o intervalo dos histogramas
     min_value = min(final_values)
     max_value = max(max(best_values), max(step_best_state_found))
 
     # Configurando os parâmetros do histograma
-    bins = np.arange(min_value, max_value + 100, 100)  # Faixas de 100 em 100
+    bins = np.arange(min_value, max_value + 50, 50)  # Faixas de 50 em 50
 
     # Criando a figura e os eixos
     fig, axs = plt.subplots(3, 1, figsize=(10, 12))  # Alterando para 3 subplots
@@ -220,7 +229,7 @@ def plot_absolute_values_histogram(final_values, best_values, step_best_state_fo
     # Histograma para step_best_state_found
     min_step = min(step_best_state_found)
     max_step = max(step_best_state_found)
-    bins_step = np.arange(min_step, max_step + 10, 10)  # Faixas de 100 em 100 específicas para step_best_state_found
+    bins_step = np.arange(min_step, max_step + 10, 10)  # Faixas de 10 em 10 específicas para step_best_state_found
 
     axs[2].hist(step_best_state_found, bins=bins_step, alpha=0.7, color='orange', edgecolor='black')
     axs[2].set_title('Distribuição dos passos em que os melhores valores foram encontrados')
@@ -237,28 +246,48 @@ def plot_absolute_values_histogram(final_values, best_values, step_best_state_fo
     axs[2].grid(axis='y', color='black', linestyle='-', linewidth=0.5)  # Grade horizontal preta
 
     # Ajustando o layout
-    plt.tight_layout()
+    plt.subplots_adjust(hspace=0.5)  # Espaçamento vertical    
     plt.show()
 
-knapsack_weight_capacity = 300
+knapsack_weight_capacity = 1000
 item_names = ["Diamante", "Ouro", "Prata", "Bronze", "Ferro", "Cobre", "Pedra", "Platina", "Aço", "Carvão"]
-items_list = create_items(item_names)
+min_item_weight = 1
+max_item_weight = 50
+min_item_value = 1
+max_item_value = 50
+items_list = create_items(item_names, min_item_weight, max_item_weight, min_item_value, max_item_value)
 
 def main():
     final_best_states_list = []
     number_of_iterations = 1000
+    start_temperature = 100 # Alterar variável e fazer teste
+    temperature_function = "linear" # Alterar e fazer teste. opção "exponential" ou "linear"
+    changing_rate = 0.9 # Alterar e fazer teste. 0 < valor < 1
+    starting_state = create_random_state() # Alterar para fora ou dentro do loop
 
     for _ in range (number_of_iterations):
-        starting_state = create_random_state()
-        start_temperature = 100
-        temperature_function = "linear"
-        changing_rate = 0.8
         final_state, best_state, step_best_state_found = simulated_annealing(starting_state, start_temperature, temperature_function, changing_rate)
         final_best_states_list.append([final_state, best_state, step_best_state_found])
         #print_best_state(best_state)
 
     final_values, best_values, step_best_state_found = zip(*[(final_state.get_total_value(), best_state.get_total_value(), step_best_state_found) for final_state, best_state, step_best_state_found in final_best_states_list])
-    plot_absolute_values_histogram(final_values, best_values, step_best_state_found)
+    plot_histograms(final_values, best_values, step_best_state_found)
 
 if __name__ == "__main__":
-    main()
+    # Cria um profiler
+    pr = cProfile.Profile()
+    pr.enable()  # Inicia o profiling
+
+    main()  # Chama a função main
+
+    pr.disable()  # Desativa o profiling
+    s = io.StringIO()
+    sortby = pstats.SortKey.CUMULATIVE  # Pode ser 'time' ou 'cumulative'
+    ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+    ps.print_stats()
+
+    # Salva os resultados em um arquivo .txt
+    with open("profiling_results.txt", "w") as f:
+        f.write(s.getvalue())
+
+    print("Resultados de profiling salvos em 'profiling_results.txt'.")
