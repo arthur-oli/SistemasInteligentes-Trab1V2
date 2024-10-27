@@ -128,6 +128,7 @@ def create_possible_state(current_state):
 
 def simulated_annealing(starting_state, start_temperature, temperature_function, changing_rate):
     current_step = 1
+    step_best_state_found = 1
     T = start_temperature
     current_state = deepcopy(starting_state)
     best_state = deepcopy(starting_state)
@@ -138,6 +139,7 @@ def simulated_annealing(starting_state, start_temperature, temperature_function,
             current_state = deepcopy(possible_state)
             if(possible_state.get_total_value() > best_state.get_total_value()):
                 best_state = deepcopy(possible_state)
+                step_best_state_found = current_step
         
         elif random.random() < exp(delta_value / T):
             current_state = deepcopy(possible_state)
@@ -145,7 +147,7 @@ def simulated_annealing(starting_state, start_temperature, temperature_function,
         T = calculate_temperature(start_temperature, temperature_function, changing_rate, current_step)
         current_step += 1
     
-    return current_state, best_state
+    return current_state, best_state, step_best_state_found
 
 def print_best_state(best_state):
     best_state_items = best_state.get_item_list()
@@ -183,27 +185,43 @@ def plot_absolute_values_histogram(final_values, best_values):
     fig, axs = plt.subplots(2, 1, figsize=(10, 8))
 
     # Histograma para final_values
+    final_hist, _ = np.histogram(final_values, bins=bins)
     axs[0].hist(final_values, bins=bins, alpha=0.7, color='blue', edgecolor='black')
     axs[0].set_title('Histograma de Final Values')
     axs[0].set_xlabel('Valores')
     axs[0].set_ylabel('Frequência')
     axs[0].set_xticks(bins)  # Adiciona ticks personalizados no eixo x
-    axs[0].set_yticks(range(0, max(np.histogram(final_values, bins=bins)[0]) + 1))  # Divisão de 1 em 1
+
+    # Calcular o máximo da frequência para final_values
+    final_max = final_hist.max()
+    
+    # Definindo os ticks do eixo y de forma dinâmica
+    y_ticks = np.linspace(0, final_max, num=11).astype(int)  # Garante que o máximo esteja incluído
+    axs[0].set_yticks(y_ticks)  # Adiciona ticks dinâmicos no eixo y
     axs[0].grid(axis='y', color='black', linestyle='-', linewidth=0.5)  # Grade horizontal preta
 
     # Histograma para best_values
+    best_hist, _ = np.histogram(best_values, bins=bins)
     axs[1].hist(best_values, bins=bins, alpha=0.7, color='green', edgecolor='black')
     axs[1].set_title('Histograma de Best Values')
     axs[1].set_xlabel('Valores')
     axs[1].set_ylabel('Frequência')
     axs[1].set_xticks(bins)  # Adiciona ticks personalizados no eixo x
-    axs[1].set_yticks(range(0, max(np.histogram(best_values, bins=bins)[0]) + 1))  # Divisão de 1 em 1
-    axs[1].grid(axis='y', color='black', linestyle='-', linewidth=0.5)  # Grade horizontal preta
 
-    # Definindo o limite do eixo y para ambos os histogramas
-    max_y_limit = max(max(np.histogram(final_values, bins=bins)[0]), max(np.histogram(best_values, bins=bins)[0]))
+    # Calcular o máximo da frequência para best_values
+    best_max = best_hist.max()
+
+    # O limite do eixo y deve ser o máximo entre final_max e best_max
+    max_y_limit = max(final_max, best_max)
+    
+    # Definindo os ticks do eixo y de forma dinâmica para ambos os histogramas
+    y_ticks_combined = np.linspace(0, max_y_limit, num=11).astype(int)  # Garante que o máximo esteja incluído
     axs[0].set_ylim(0, max_y_limit)  # Limite y para final_values
     axs[1].set_ylim(0, max_y_limit)  # Limite y para best_values
+    axs[0].set_yticks(y_ticks_combined)  # Adiciona ticks dinâmicos ao primeiro histograma
+    axs[1].set_yticks(y_ticks_combined)  # Adiciona ticks dinâmicos ao segundo histograma
+
+    axs[1].grid(axis='y', color='black', linestyle='-', linewidth=0.5)  # Grade horizontal preta
 
     # Ajustando o layout
     plt.tight_layout()
@@ -222,12 +240,12 @@ def main():
         start_temperature = 100
         temperature_function = "linear"
         changing_rate = 0.8
-        final_state, best_state = simulated_annealing(starting_state, start_temperature, temperature_function, changing_rate)
+        final_state, best_state, step_best_state_found = simulated_annealing(starting_state, start_temperature, temperature_function, changing_rate)
         final_best_states_list.append([final_state, best_state])
         #print_best_state(best_state)
 
-    final_values, best_values = zip(*[(final_state.get_total_value(), best_state.get_total_value()) for final_state, best_state in final_best_states_list])
-    plot_absolute_values_histogram(final_values, best_values)
+    final_values, best_values, step_best_state_found = zip(*[(final_state.get_total_value(), best_state.get_total_value(), step_best_state_found) for final_state, best_state, step_best_state_found in final_best_states_list])
+    plot_absolute_values_histogram(final_values, best_values, step_best_state_found)
 
 if __name__ == "__main__":
     main()
