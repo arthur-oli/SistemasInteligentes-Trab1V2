@@ -173,55 +173,68 @@ def print_best_state(best_state):
     print(f"{'Valor Total do Estado:':<35} {best_state.get_total_value():<15}")
     print(f"{'Peso Total do Estado:':<35} {best_state.get_total_weight():<15}")
 
-def plot_absolute_values_histogram(final_values, best_values):
+
+def plot_absolute_values_histogram(final_values, best_values, step_best_state_found):
     # Definindo o intervalo dos histogramas
     min_value = min(final_values)
-    max_value = max(best_values)
+    max_value = max(max(best_values), max(step_best_state_found))
 
     # Configurando os parâmetros do histograma
     bins = np.arange(min_value, max_value + 100, 100)  # Faixas de 100 em 100
 
     # Criando a figura e os eixos
-    fig, axs = plt.subplots(2, 1, figsize=(10, 8))
+    fig, axs = plt.subplots(3, 1, figsize=(10, 12))  # Alterando para 3 subplots
 
     # Histograma para final_values
-    final_hist, _ = np.histogram(final_values, bins=bins)
     axs[0].hist(final_values, bins=bins, alpha=0.7, color='blue', edgecolor='black')
-    axs[0].set_title('Histograma de Final Values')
-    axs[0].set_xlabel('Valores')
+    axs[0].set_title('Distribuição de valores dos últimos estados encontrados')
+    axs[0].set_xlabel('Valor do último estado')
     axs[0].set_ylabel('Frequência')
     axs[0].set_xticks(bins)  # Adiciona ticks personalizados no eixo x
 
     # Calcular o máximo da frequência para final_values
+    final_hist, _ = np.histogram(final_values, bins=bins)
     final_max = final_hist.max()
     
     # Definindo os ticks do eixo y de forma dinâmica
     y_ticks = np.linspace(0, final_max, num=11).astype(int)  # Garante que o máximo esteja incluído
     axs[0].set_yticks(y_ticks)  # Adiciona ticks dinâmicos no eixo y
+    axs[0].set_ylim(0, final_max)  # Garante que o eixo y vai até o máximo  
     axs[0].grid(axis='y', color='black', linestyle='-', linewidth=0.5)  # Grade horizontal preta
 
     # Histograma para best_values
-    best_hist, _ = np.histogram(best_values, bins=bins)
     axs[1].hist(best_values, bins=bins, alpha=0.7, color='green', edgecolor='black')
-    axs[1].set_title('Histograma de Best Values')
-    axs[1].set_xlabel('Valores')
+    axs[1].set_title('Distribuição de valores dos melhores estados encontrados')
+    axs[1].set_xlabel('Valor do melhor estado')
     axs[1].set_ylabel('Frequência')
     axs[1].set_xticks(bins)  # Adiciona ticks personalizados no eixo x
 
     # Calcular o máximo da frequência para best_values
+    best_hist, _ = np.histogram(best_values, bins=bins)
     best_max = best_hist.max()
-
-    # O limite do eixo y deve ser o máximo entre final_max e best_max
-    max_y_limit = max(final_max, best_max)
-    
-    # Definindo os ticks do eixo y de forma dinâmica para ambos os histogramas
-    y_ticks_combined = np.linspace(0, max_y_limit, num=11).astype(int)  # Garante que o máximo esteja incluído
-    axs[0].set_ylim(0, max_y_limit)  # Limite y para final_values
-    axs[1].set_ylim(0, max_y_limit)  # Limite y para best_values
-    axs[0].set_yticks(y_ticks_combined)  # Adiciona ticks dinâmicos ao primeiro histograma
-    axs[1].set_yticks(y_ticks_combined)  # Adiciona ticks dinâmicos ao segundo histograma
-
+    y_ticks_best = np.linspace(0, best_max, num=11).astype(int)
+    axs[1].set_ylim(0, best_max)  # Garante que o eixo y vai até o máximo
+    axs[1].set_yticks(y_ticks_best)  # Adiciona ticks dinâmicos no eixo y
     axs[1].grid(axis='y', color='black', linestyle='-', linewidth=0.5)  # Grade horizontal preta
+
+    # Histograma para step_best_state_found
+    min_step = min(step_best_state_found)
+    max_step = max(step_best_state_found)
+    bins_step = np.arange(min_step, max_step + 10, 10)  # Faixas de 100 em 100 específicas para step_best_state_found
+
+    axs[2].hist(step_best_state_found, bins=bins_step, alpha=0.7, color='orange', edgecolor='black')
+    axs[2].set_title('Distribuição dos passos em que os melhores valores foram encontrados')
+    axs[2].set_xlabel('Número do passo')
+    axs[2].set_ylabel('Frequência')
+    axs[2].set_xticks(bins_step)  # Adiciona ticks personalizados no eixo x
+
+    # Calcular o máximo da frequência para step_best_state_found
+    step_hist, _ = np.histogram(step_best_state_found, bins=bins_step)
+    step_max = step_hist.max()
+    y_ticks_step = np.linspace(0, step_max, num=11).astype(int)
+    axs[2].set_yticks(y_ticks_step)  # Adiciona ticks dinâmicos no eixo y
+    axs[2].set_ylim(0, step_max)  # Garante que o eixo y vai até o máximo
+    axs[2].grid(axis='y', color='black', linestyle='-', linewidth=0.5)  # Grade horizontal preta
 
     # Ajustando o layout
     plt.tight_layout()
@@ -229,19 +242,19 @@ def plot_absolute_values_histogram(final_values, best_values):
 
 knapsack_weight_capacity = 300
 item_names = ["Diamante", "Ouro", "Prata", "Bronze", "Ferro", "Cobre", "Pedra", "Platina", "Aço", "Carvão"]
-number_of_items = len(item_names)
 items_list = create_items(item_names)
 
 def main():
     final_best_states_list = []
+    number_of_iterations = 1000
 
-    for _ in range (300):
+    for _ in range (number_of_iterations):
         starting_state = create_random_state()
         start_temperature = 100
         temperature_function = "linear"
         changing_rate = 0.8
         final_state, best_state, step_best_state_found = simulated_annealing(starting_state, start_temperature, temperature_function, changing_rate)
-        final_best_states_list.append([final_state, best_state])
+        final_best_states_list.append([final_state, best_state, step_best_state_found])
         #print_best_state(best_state)
 
     final_values, best_values, step_best_state_found = zip(*[(final_state.get_total_value(), best_state.get_total_value(), step_best_state_found) for final_state, best_state, step_best_state_found in final_best_states_list])
