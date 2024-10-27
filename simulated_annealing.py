@@ -1,7 +1,6 @@
 import random
 from collections import defaultdict
 from math import exp
-from pprint import pprint
 
 class Item:
     def __init__(self, weight, value, name):
@@ -26,20 +25,6 @@ class State:
 
         self.total_items_weight += item.weight
         self.total_items_value += item.value
-
-    def calculate_total_value(self):
-        total_items_value = 0
-        for item, quantity in self.item_list.items():
-            total_items_value += item.value * quantity
-        
-        return total_items_value
-    
-    def calculate_total_weight(self):
-        total_items_weight = 0
-        for item, quantity in self.item_list.items():
-            total_items_weight += item.weight * quantity 
-
-        return total_items_weight
 
     def get_total_value(self):
         return self.total_items_value       
