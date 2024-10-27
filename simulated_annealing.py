@@ -1,12 +1,21 @@
 import random
 from collections import defaultdict
 from math import exp
+from copy import deepcopy
+import matplotlib.pyplot as plt
+import numpy as np
 
 class Item:
     def __init__(self, weight, value, name):
         self.weight = weight
         self.value = value
         self.name = name
+
+    def __hash__(self):
+        return hash((self.weight, self.value, self.name))
+
+    def __eq__(self, other):
+        return self.weight == other.weight and self.value == other.value and self.name == other.name
 
     def get_value(self):
         return self.value
@@ -16,15 +25,30 @@ class State:
         self.item_list = defaultdict(int)
         self.total_items_weight = 0
         self.total_items_value = 0
-    
+
     def add_item(self, item):
         if item in self.item_list:
             self.item_list[item] += 1
         else:
             self.item_list[item] = 1
-
         self.total_items_weight += item.weight
         self.total_items_value += item.value
+
+    def get_unique_item_count(self):
+        return len(self.item_list)
+
+    def remove_item(self, item):
+        if item in self.item_list and self.item_list[item] > 0:
+            self.item_list[item] -= 1
+            self.total_items_weight -= item.weight
+            self.total_items_value -= item.value
+            if self.item_list[item] == 0:
+                del self.item_list[item]
+
+    def get_random_item(self):
+        if not self.item_list:
+            return None
+        return random.choice(list(self.item_list.keys()))
 
     def get_total_value(self):
         return self.total_items_value       
@@ -71,29 +95,119 @@ def calculate_temperature(start_temperature, temperature_function, changing_rate
     return T
 
 def create_possible_state(current_state):
-    return create_random_state()
+    possible_state = deepcopy(current_state)
+    operation = random.choice(["add", "remove", "swap"])
+
+    if operation == "add":
+        item_to_add = random.choice(items_list)
+        if (possible_state.get_total_weight() + item_to_add.weight <= knapsack_weight_capacity):
+            possible_state.add_item(item_to_add)
+
+    if operation == "remove":
+        if(possible_state.get_unique_item_count() < 2):
+            return possible_state
+        
+        item_to_remove = possible_state.get_random_item()
+        possible_state.remove_item(item_to_remove)
+    
+    if operation == "swap":
+        if(possible_state.get_unique_item_count() < 2):
+            return possible_state
+        
+        item_to_remove = possible_state.get_random_item()
+        item_to_add = possible_state.get_random_item()
+
+        while(item_to_add == item_to_remove):
+            item_to_add = possible_state.get_random_item()
+
+        if (possible_state.get_total_weight() + item_to_add.weight <= knapsack_weight_capacity):
+            possible_state.remove_item(item_to_remove)
+            possible_state.add_item(item_to_add)
+
+    return possible_state
 
 def simulated_annealing(starting_state, start_temperature, temperature_function, changing_rate):
     current_step = 1
     T = start_temperature
-    current_state = starting_state
-    best_state = starting_state
+    current_state = deepcopy(starting_state)
+    best_state = deepcopy(starting_state)
     while (T > 0):
         possible_state = create_possible_state(current_state)
         delta_value = possible_state.get_total_value() - current_state.get_total_value() 
         if(delta_value > 0):
-            current_state = possible_state
+            current_state = deepcopy(possible_state)
             if(possible_state.get_total_value() > best_state.get_total_value()):
-                best_state = possible_state
+                best_state = deepcopy(possible_state)
         
         elif random.random() < exp(delta_value / T):
-            current_state = possible_state
-
+            current_state = deepcopy(possible_state)
 
         T = calculate_temperature(start_temperature, temperature_function, changing_rate, current_step)
         current_step += 1
     
     return current_state, best_state
+
+def print_best_state(best_state):
+    best_state_items = best_state.get_item_list()
+    best_state_items_details = [
+        {
+        'name': item.name,
+        'quantity': quantity,
+        'value': item.value,
+        'weight': item.weight,
+        'total_value': item.value * quantity,
+        'total_weight': item.weight * quantity,
+        'value_weight_ratio': item.value/item.weight,
+        }
+        for item, quantity in best_state_items.items()
+    ]
+    print("Itens no Estado:")
+    print("-" * 120)
+    print(f"{'Nome':<15} {'Quantidade':<10} {'Valor':<10} {'Peso':<10} {'Valor Total':<15} {'Peso Total':<15} {'Valor/Peso':<15}")
+    print("-" * 120)
+    for item in best_state_items_details:
+        print(f"{item['name']:<15} {item['quantity']:<10} {item['value']:<10} {item['weight']:<10} {item['total_value']:<15} {item['total_weight']:<15} {item['value_weight_ratio']:<15.2f}")
+    print("-" * 120)
+    print(f"{'Valor Total do Estado:':<35} {best_state.get_total_value():<15}")
+    print(f"{'Peso Total do Estado:':<35} {best_state.get_total_weight():<15}")
+
+def plot_absolute_values_histogram(final_values, best_values):
+    # Definindo o intervalo dos histogramas
+    min_value = min(final_values)
+    max_value = max(best_values)
+
+    # Configurando os parâmetros do histograma
+    bins = np.arange(min_value, max_value + 100, 100)  # Faixas de 100 em 100
+
+    # Criando a figura e os eixos
+    fig, axs = plt.subplots(2, 1, figsize=(10, 8))
+
+    # Histograma para final_values
+    axs[0].hist(final_values, bins=bins, alpha=0.7, color='blue', edgecolor='black')
+    axs[0].set_title('Histograma de Final Values')
+    axs[0].set_xlabel('Valores')
+    axs[0].set_ylabel('Frequência')
+    axs[0].set_xticks(bins)  # Adiciona ticks personalizados no eixo x
+    axs[0].set_yticks(range(0, max(np.histogram(final_values, bins=bins)[0]) + 1))  # Divisão de 1 em 1
+    axs[0].grid(axis='y', color='black', linestyle='-', linewidth=0.5)  # Grade horizontal preta
+
+    # Histograma para best_values
+    axs[1].hist(best_values, bins=bins, alpha=0.7, color='green', edgecolor='black')
+    axs[1].set_title('Histograma de Best Values')
+    axs[1].set_xlabel('Valores')
+    axs[1].set_ylabel('Frequência')
+    axs[1].set_xticks(bins)  # Adiciona ticks personalizados no eixo x
+    axs[1].set_yticks(range(0, max(np.histogram(best_values, bins=bins)[0]) + 1))  # Divisão de 1 em 1
+    axs[1].grid(axis='y', color='black', linestyle='-', linewidth=0.5)  # Grade horizontal preta
+
+    # Definindo o limite do eixo y para ambos os histogramas
+    max_y_limit = max(max(np.histogram(final_values, bins=bins)[0]), max(np.histogram(best_values, bins=bins)[0]))
+    axs[0].set_ylim(0, max_y_limit)  # Limite y para final_values
+    axs[1].set_ylim(0, max_y_limit)  # Limite y para best_values
+
+    # Ajustando o layout
+    plt.tight_layout()
+    plt.show()
 
 knapsack_weight_capacity = 300
 item_names = ["Diamante", "Ouro", "Prata", "Bronze", "Ferro", "Cobre", "Pedra", "Platina", "Aço", "Carvão"]
@@ -101,43 +215,19 @@ number_of_items = len(item_names)
 items_list = create_items(item_names)
 
 def main():
-    for _ in range (1):
+    final_best_states_list = []
+
+    for _ in range (300):
         starting_state = create_random_state()
         start_temperature = 100
-        temperature_function = "exponential"
-        changing_rate = 0.9
+        temperature_function = "linear"
+        changing_rate = 0.8
         final_state, best_state = simulated_annealing(starting_state, start_temperature, temperature_function, changing_rate)
-        best_state_items = best_state.get_item_list()
-        best_state_items_details = [
-            {
-            'name': item.name,
-            'quantity': quantity,
-            'value': item.value,
-            'weight': item.weight,
-            'total_value': item.value * quantity,
-            'total_weight': item.weight * quantity,
-            'value_weight_ratio': item.value/item.weight,
-            }
-            for item, quantity in best_state_items.items()
-        ]
+        final_best_states_list.append([final_state, best_state])
+        #print_best_state(best_state)
 
-    print("Itens no Estado:")
-    print("-" * 120)
-    print(f"{'Nome':<15} {'Quantidade':<10} {'Valor':<10} {'Peso':<10} {'Valor Total':<15} {'Peso Total':<15} {'Valor/Peso':<15}")
-    print("-" * 120)
-    for item in best_state_items_details:
-        print(f"{item['name']:<15} {item['quantity']:<10} {item['value']:<10} {item['weight']:<10} {item['total_value']:<15} {item['total_weight']:<15} {item['value_weight_ratio']:<15.2f}")
-    # Exibindo o valor total e o peso total do estado
-    print("-" * 120)
-    print(f"{'Valor Total do Estado:':<35} {best_state.get_total_value():<15}")
-    print(f"{'Peso Total do Estado:':<35} {best_state.get_total_weight():<15}")
-
-    # Acesso ao primeiro item
-    # item_iterator = iter(starting_state.get_item_list())  # Cria um iterador sobre os itens
-    # first_item = next(item_iterator)  # Obtém o primeiro item
-    # quantity_first_item = starting_state.get_item_list()[first_item]
-    # i, q = starting_state.get_item_by_name("Carvão")
-
+    final_values, best_values = zip(*[(final_state.get_total_value(), best_state.get_total_value()) for final_state, best_state in final_best_states_list])
+    plot_absolute_values_histogram(final_values, best_values)
 
 if __name__ == "__main__":
     main()
