@@ -23,7 +23,6 @@ max_item_weight = 50
 min_item_value = 1
 max_item_value = 50
 
-
 class Item:
     item_list: None | list[Self] = None
 
@@ -111,8 +110,11 @@ class Backpack:
     def get_random_item(self):
         if not self.item_counts:
             return None
-        return random.choice(list(self.item_counts.keys()))
-
+            
+        items = list(self.item_counts.keys())
+        item_weights = list(self.item_counts.values())
+        return random.choices(items, weights=item_weights)[0]
+    
     def get_total_value(self):
         return self.total_items_value
 
@@ -186,7 +188,8 @@ def plot_histograms(final_values, best_values, step_best_state_found):
     max_value = max(max(best_values), max(final_values))
 
     # Configurando os parâmetros do histograma
-    bucket_size = (max_value - min_value) / 10
+    bucket_size = round((max_value - min_value) / 10)
+    if bucket_size < 0: bucket_size = 1
     bins = np.arange(min_value, max_value, bucket_size)  # Faixas de 50 em 50
 
     # Criando a figura e os eixos
@@ -233,7 +236,7 @@ def plot_histograms(final_values, best_values, step_best_state_found):
     # Histograma para step_best_state_found
     min_step = min(step_best_state_found)
     max_step = max(step_best_state_found)
-    bucket_size = (max_step - min_step) / 10
+    bucket_size = round((max_step - min_step) / 10)
     bins_step = np.arange(
         min_step, max_step + 10, bucket_size
     )  # Faixas de 10 em 10 específicas para step_best_state_found
@@ -291,7 +294,6 @@ def main():
             for final_state, best_state, step_best_state_found in final_best_states_list
         ]
     )
-    print("Best value found on all iterations:", max(best_values), "\nBest value according to greedy approach:", max(best_values))
     plot_histograms(final_values, best_values, step_best_state_found)
 
 if __name__ == "__main__":
